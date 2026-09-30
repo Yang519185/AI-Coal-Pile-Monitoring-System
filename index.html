@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#e9edf8">
+    <script>
+    (function () {
+        const choice = new URLSearchParams(location.search).get('view');
+        const media = matchMedia('(max-width: 680px)');
+        function setEdition() {
+            document.documentElement.dataset.edition = choice === 'mobile' ? 'mobile' : choice === 'desktop' ? 'desktop' : media.matches ? 'mobile' : 'desktop';
+        }
+        setEdition();
+        media.addEventListener('change', setEdition);
+    })();
+    </script>
+    <title>IoT温度监控平台 - 嵌入式设备远程监测系统</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='12' fill='%230071e3'/%3E%3Cpath d='M13 30 L19 18 L25 26 L31 14 L37 30' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='37' cy='14' r='3' fill='%2334c759'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/theme-industrial-dark.css">
+    <link rel="stylesheet" href="css/theme-apple-light.css?v=studio-2">
+    <link rel="stylesheet" href="css/theme-liquid-glass.css?v=3">
+    <link rel="stylesheet" href="css/theme-sidebar-simple.css?v=4">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+    // 界面主题：Chart.js 全局字体与基础颜色
+    window.addEventListener('load', function () {
+        if (typeof Chart === 'undefined') return;
+        Chart.defaults.color = '#6e6e73';
+        Chart.defaults.borderColor = 'rgba(0, 0, 0, 0.08)';
+        Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif';
+    });
+    </script>
+    <!-- MQTT.js -->
+    <script src="https://cdn.jsdelivr.net/npm/mqtt@5.3.0/dist/mqtt.min.js"></script>
+    <!-- Three.js (煤堆三维热力可视化) -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+</head>
+<body class="console-boot">
+    <!-- ========== 侧边栏 ========== -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <svg class="logo-icon" viewBox="0 0 48 48" fill="none">
+                    <rect width="48" height="48" rx="12" fill="#0071e3"/>
+                    <path d="M13 30 L19 18 L25 26 L31 14 L37 30" stroke="#ffffff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="37" cy="14" r="3" fill="#34c759"/>
+                </svg>
+                <div class="logo-text">
+                    <span class="logo-title">IoT Monitor</span>
+                    <span class="logo-subtitle">温度监控平台</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar-section-label">工作空间</div>
+        <nav class="sidebar-nav" aria-label="主导航">
+            <a href="#" class="nav-item active" data-page="dashboard">
+                <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" fill="currentColor"/></svg>
+                <span>仪表盘</span>
+            </a>
+            <a href="#" class="nav-item" data-page="coal3d">
+                <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 2L2 7v10l10 5 10-5V7l-10-5zm0 2.3L19.2 8 12 11.6 4.8 8 12 4.3zM4 16.3v-5.9l8 4 8-4v5.9l-8 4-8-4z" fill="currentColor"/></svg>
+                <span>煤堆3D</span>
+            </a>
+            <a href="#" class="nav-item" data-page="history">
+                <svg class="nav-icon" viewBox="0 0 24 24"><path d="M13 3a9 9 0 00-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0013 21a9 9 0 000-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z" fill="currentColor"/></svg>
+                <span>历史数据</span>
+            </a>
+            <a href="#" class="nav-item" data-page="settings">
+                <svg class="nav-icon" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94L14.4 2.81a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41L9.25 5.35c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" fill="currentColor"/></svg>
+                <span>系统设置</span>
+            </a>
+            <a href="#" class="nav-item" data-page="about">
+                <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" fill="currentColor"/></svg>
+                <span>关于系统</span>
+            </a>
+        </nav>
+
+        <button class="sidebar-shortcut" type="button" data-open-config>
+            <span class="shortcut-icon" aria-hidden="true">+</span>
+            <span><strong>连接你的设备</strong><small>开启实时温度监测</small></span>
+            <span class="shortcut-arrow" aria-hidden="true">↗</span>
+        </button>
+        <div class="sidebar-footer">
+            <div class="system-status">
+                <span class="status-dot" id="sidebarStatusDot"></span>
+                <span id="sidebarStatusText">未连接</span>
+            </div>
+            <div class="version">v2.0.0</div>
+        </div>
+    </aside>
+
+    <!-- ========== 主内容区 ========== -->
+    <main class="main-content">
+        <!-- 顶部栏 -->
+        <header class="topbar">
+            <button class="sidebar-toggle" id="sidebarToggle" title="展开或收起导航" aria-label="展开或收起导航" aria-controls="sidebar">
+                <svg viewBox="0 0 24 24" width="24" height="24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" fill="currentColor"/></svg>
+            </button>
+
+            <span class="workspace-label">工作空间 <span aria-hidden="true">/</span></span>
+            <h1 class="page-title" id="pageTitle">仪表盘</h1>
+            <div class="mobile-brand" aria-hidden="true"><span class="mobile-brand-mark">◈</span><span><strong>IoT Monitor</strong><small>温度监测</small></span></div>
+
+            <div class="topbar-right">
+                <!-- 模式切换 -->
+                <div class="mode-selector">
+                    <span class="mode-label">连接模式：</span>
+                    <div class="mode-tabs">
+                        <button class="mode-tab active" data-mode="emqx" id="modeEmqx">EMQX 服务器</button>
+                        <button class="mode-tab" data-mode="socket" id="modeSocket">网口直连</button>
+                    </div>
+                </div>
+
+                <!-- 连接按钮 -->
+                <button class="btn-connect" id="btnConnect">
+                    <span class="btn-connect-icon">&#9679;</span>
+                    连接
+                </button>
+                <button class="btn-disconnect" id="btnDisconnect" disabled>
+                    <span class="btn-disconnect-icon">&#9632;</span>
+                    断开
+                </button>
+
+                <!-- 时间显示 -->
+                <div class="topbar-clock" id="topbarClock">--:--:--</div>
+            </div>
+            <a class="edition-switch" href="mobile.html" aria-label="切换到手机版"><span class="edition-desktop-label">手机版</span><span class="edition-mobile-label">网页版</span><span aria-hidden="true">↗</span></a>
+        </header>
+
+        <!-- ===== 仪表盘页面 ===== -->
+        <section class="page active" id="page-dashboard">
+            <header class="page-intro dashboard-intro">
+                <div>
+                    <div class="eyebrow"><span class="eyebrow-dot"></span> LIVE MONITORING</div>
+                    <h2>每一度变化，<span>尽在掌握。</span></h2>
+                    <p>让温度有迹可循，让设备状态一目了然。</p>
+                </div>
+                <div class="intro-aside">
+                    <time id="overviewDate"></time>
+                    <span class="overview-chip"><i aria-hidden="true"></i><span id="overviewConnectionLabel">等待设备连接</span></span>
+                </div>
+            </header>
+            <!-- 连接参数卡片 -->
+            <details class="card connection-card" id="connectionCard">
+                <summary class="card-header connection-summary">
+                    <h3 class="card-title">
+                        <svg class="card-title-icon" viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z" fill="currentColor"/></svg>
+                        连接配置
+                    </h3>
+                    <span class="connection-summary-value" id="connectionSummaryValue">EMQX · broker.emqx.io</span>
+                    <span class="connection-summary-action">配置数据源 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></span>
+                </summary>
+                <div class="card-body">
+                    <div class="config-grid" id="configEmqx">
+                        <div class="config-item">
+                            <label>Broker 地址</label>
+                            <input type="text" id="emqxHost" value="broker.emqx.io" placeholder="broker.emqx.io">
+                        </div>
+                        <div class="config-item">
+                            <label>端口 (WebSocket)</label>
+                            <input type="number" id="emqxPort" value="8083" placeholder="8083">
+                        </div>
+                        <div class="config-item">
+                            <label>客户端 ID</label>
+                            <input type="text" id="emqxClientId" placeholder="自动生成">
+                        </div>
+                        <div class="config-item">
+                            <label>用户名</label>
+                            <input type="text" id="emqxUsername" placeholder="可选">
+                        </div>
+                        <div class="config-item">
+                            <label>密码</label>
+                            <input type="password" id="emqxPassword" placeholder="可选">
+                        </div>
+                        <div class="config-item">
+                            <label>命名空间 (设备前缀)</label>
+                            <input type="text" id="emqxPrefix" value="iot_device" placeholder="iot_device" style="font-family: var(--font-mono);">
+                        </div>
+                        <div class="config-item">
+                            <label>传感器数量 (订阅主题数)</label>
+                            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                                <input type="number" id="configSensorCount" value="3" min="1" max="8" step="1" style="width:60px;min-width:60px;flex:none">
+                                <span style="font-size:11px;color:var(--color-text-muted)" id="configTopicPreview">→ topic1, topic2, topic3</span>
+                            </div>
+                        </div>
+                        <div class="config-item config-item-warning">
+                            <label>⚠ 数据隔离说明</label>
+                            <p class="config-hint">
+                                设备端通过 <b>MQTT_TOPIC_PREFIX</b> 宏定义前缀（默认 <b>iot_device</b>），
+                                发布到 <b>iot_device/topic1</b> 等主题。<br>
+                                网页端使用<b>相同前缀</b>订阅，自动过滤其他用户的公共主题消息。
+                                修改设备前缀后需重新编译，并在此处同步更新。
+                            </p>
+                        </div>
+                    </div>
+                    <div class="config-grid hidden" id="configSocket">
+                        <div class="config-item">
+                            <label>服务器地址</label>
+                            <input type="text" id="socketHost" value="192.168.1.100" placeholder="192.168.1.100">
+                        </div>
+                        <div class="config-item">
+                            <label>端口号</label>
+                            <input type="number" id="socketPort" value="9000" placeholder="9000">
+                        </div>
+                        <div class="config-item">
+                            <label>协议类型</label>
+                            <select id="socketProtocol">
+                                <option value="websocket">WebSocket</option>
+                                <option value="tcp">TCP Socket</option>
+                            </select>
+                        </div>
+                        <div class="config-item">
+                            <label>数据格式</label>
+                            <select id="socketFormat">
+                                <option value="json">JSON</option>
+                                <option value="csv">CSV</option>
+                                <option value="raw">Raw Text</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <div class="section-heading sensor-section-heading">
+                <div><h3>传感器</h3><span id="sensorCountLabel">3 个监测点</span></div>
+                <button class="text-action" type="button" data-go-page="coal3d">查看三维热场 <span aria-hidden="true">↗</span></button>
+            </div>
+
+            <!-- 连接状态卡片 -->
+            <div class="card status-card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <svg class="card-title-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="currentColor"/></svg>
+                        连接概况
+                    </h3>
+                    <span class="badge" id="connectionBadge">● 离线</span>
+                </div>
+                <div class="card-body">
+                    <div class="connection-visual">
+                        <div class="signal-emblem" aria-hidden="true">
+                            <svg viewBox="0 0 48 48"><path d="M9 19a23 23 0 0 1 30 0M15 26a14 14 0 0 1 18 0M21 33a5 5 0 0 1 6 0"/><circle cx="24" cy="39" r="1.6"/></svg>
+                        </div>
+                        <h4 id="sessionHeading">随时准备，接收新数据。</h4>
+                        <p id="sessionDescription">连接设备后，监测将在此开始。</p>
+                    </div>
+                    <div class="status-grid">
+                        <div class="status-item">
+                            <div class="status-label">连接状态</div>
+                            <div class="status-value">
+                                <span class="led led-off" id="ledConnection"></span>
+                                <span id="textConnection">未连接</span>
+                            </div>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-label">当前模式</div>
+                            <div class="status-value" id="textMode">--</div>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-label">消息速率</div>
+                            <div class="status-value" id="textMsgRate">0 msg/s</div>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-label">运行时长</div>
+                            <div class="status-value" id="textUptime">00:00:00</div>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-label">接收消息数</div>
+                            <div class="status-value" id="textMsgCount">0</div>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-label">外部消息过滤</div>
+                            <div class="status-value" id="textPacketLoss">0 条</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 实时数据卡片 -->
+            <div class="data-cards-row" id="sensorCardsContainer">
+                <!-- 传感器卡片将在初始化时动态生成 -->
+            </div>
+
+            <!-- 温度图表 -->
+            <div class="card chart-card">
+                <div class="card-header">
+                    <div class="card-heading"><h3 class="card-title">温度趋势</h3><p>持续记录，发现细微变化。</p></div>
+                    <div class="chart-controls">
+                        <div class="chart-checkbox-group" id="chartCheckboxGroup">
+                            <!-- 传感器复选框将在初始化时动态生成 -->
+                        </div>
+                        <button class="btn-sm" id="btnClearChart">清除图表</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="temperatureChart"></canvas>
+                        <div class="chart-empty-state" id="chartEmptyState">
+                            <span class="empty-chart-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M6 23V9m10 18V5m10 16V11"/></svg></span>
+                            <h4 id="chartEmptyTitle">等待第一条温度数据</h4>
+                            <p id="chartEmptyDescription">连接设备后，温度变化将在这里实时呈现。</p>
+                            <button type="button" class="text-action" data-open-config>配置数据源 <span aria-hidden="true">→</span></button>
+                        </div>
+                    </div>
+                    <div class="chart-caption"><span><i></i>实时采集</span><span id="thresholdCaption">报警阈值 0°C — 50°C</span></div>
+                </div>
+            </div>
+
+            <!-- 最近消息日志 -->
+            <div class="card log-card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <svg class="card-title-icon" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" fill="currentColor"/></svg>
+                        消息日志
+                    </h3>
+                    <button class="btn-sm" id="btnClearLog">清空日志</button>
+                </div>
+                <div class="card-body">
+                    <div class="log-container" id="logContainer">
+                        <div class="log-empty">连接设备后，接收记录将显示在这里。</div>
+                    </div>
+                </div>
+            </div>
+            <footer class="workspace-footer"><span>IoT Monitor</span><span>温度有迹可循。</span></footer>
+        </section>
+
+        <!-- ===== 煤堆三维热力可视化页面 ===== -->
+        <section class="page" id="page-coal3d">
+            <header class="page-intro">
+                <div><div class="eyebrow">SPATIAL INSIGHTS</div><h2>深入每一层<span>温度。</span></h2><p>以三维视角，观察煤堆内部热场与深度变化。</p></div>
+                <div class="intro-aside"><span class="intro-note">8 层深度 · 多点感知</span><span class="intro-helper">选择传感器，探索内部热场 ↘</span></div>
+            </header>
+            <!-- 传感器煤堆卡片网格 -->
+            <div class="coal3d-card-grid" id="coal3dCardGrid">
+                <!-- 卡片将在初始化时动态生成 -->
+            </div>
+
+            <!-- 选中传感器的独立大煤堆视图 -->
+            <div class="card coal3d-detail-card hidden" id="coal3dDetailCard">
+                <div class="card-header">
+                    <h3 class="card-title" id="coal3dDetailTitle">
+                        <svg class="card-title-icon" viewBox="0 0 24 24"><path d="M12 2L2 7v10l10 5 10-5V7l-10-5zm0 2.3L19.2 8 12 11.6 4.8 8 12 4.3zM4 16.3v-5.9l8 4 8-4v5.9l-8 4-8-4z" fill="currentColor"/></svg>
+                        煤堆详情
+                    </h3>
+                    <div class="chart-controls">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="c3dAutoRotate" checked> 自动旋转
+                        </label>
+                        <button class="btn-sm" id="btnC3dReset">重置视角</button>
+                        <button class="btn-sm" id="btnC3dBack">← 返回列表</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="coal3d-layout">
+                        <div class="coal3d-stage" id="coal3dStage">
+                            <div class="coal3d-hint">正在初始化三维场景...</div>
+                            <div class="coal3d-tooltip" id="coal3dTooltip"></div>
+                        </div>
+                        <div class="coal3d-sidebar">
+                            <div class="c3d-legend-block">
+                                <div class="c3d-legend-label">温度色标 (°C)</div>
+                                <div class="c3d-legend-bar" id="c3dLegendBar"></div>
+                                <div class="c3d-legend-scale"><span>70</span><span>0</span></div>
+                            </div>
+                            <div class="c3d-info">
+                                <p class="c3d-info-title">测点说明</p>
+                                <p>该传感器 8 层深度温度数据。球体颜色代表该点温度，拖动旋转、滚轮缩放，悬停查看测点详情。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== 传感器详情页 (动态) ===== -->
+        <section class="page" id="page-topic-detail">
+            <div class="detail-topbar">
+                <button class="btn-back" onclick="closeTopicDetail()">
+                    <svg viewBox="0 0 24 24" width="24" height="24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" fill="currentColor"/></svg>
+                    返回仪表盘
+                </button>
+                <span class="detail-badge" id="detailBadge">QoS 0</span>
+            </div>
+
+            <div class="detail-hero">
+                <div class="detail-hero-left">
+                    <h2 class="detail-title" id="detailTitle">--</h2>
+                    <div class="detail-subtitle" id="detailSubtitle">iot_device/topic1</div>
+                </div>
+                <div class="detail-hero-right">
+                    <div class="detail-temp-large" id="detailTempLarge">--.-</div>
+                    <div class="detail-temp-unit">°C</div>
+                </div>
+            </div>
+
+            <!-- 统计卡片 -->
+            <div class="detail-stats-row">
+                <div class="detail-stat">
+                    <div class="detail-stat-label">当前值</div>
+                    <div class="detail-stat-value" id="detailCurrent">-- °C</div>
+                </div>
+                <div class="detail-stat">
+                    <div class="detail-stat-label">最大值</div>
+                    <div class="detail-stat-value" id="detailMax">-- °C</div>
+                </div>
+                <div class="detail-stat">
+                    <div class="detail-stat-label">最小值</div>
+                    <div class="detail-stat-value" id="detailMin">-- °C</div>
+                </div>
+                <div class="detail-stat">
+                    <div class="detail-stat-label">平均值</div>
+                    <div class="detail-stat-value" id="detailAvg">-- °C</div>
+                </div>
+                <div class="detail-stat">
+                    <div class="detail-stat-label">数据点数</div>
+                    <div class="detail-stat-value" id="detailCount">0</div>
+                </div>
+                <div class="detail-stat">
+                    <div class="detail-stat-label">报警状态</div>
+                    <div class="detail-stat-value" id="detailAlarmStatus">正常</div>
+                </div>
+            </div>
+
+            <!-- 深度温度选择器 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <svg class="card-title-icon" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="currentColor"/></svg>
+                        深度温度
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="depth-grid" id="detailDepthGrid">
+                        <div class="depth-item" data-depth="0">
+                            <div class="depth-label">表层</div>
+                            <div class="depth-temp">--.-°C</div>
+                            <div class="depth-bar"><div class="depth-bar-fill"></div></div>
+                        </div>
+                        <div class="depth-item" data-depth="1">
+                            <div class="depth-label">第2层</div>
+                            <div class="depth-temp">--.-°C</div>
+                            <div class="depth-bar"><div class="depth-bar-fill"></div></div>
+                        </div>
+                        <div class="depth-item" data-depth="2">
+                            <div class="depth-label">第3层</div>
+                            <div class="depth-temp">--.-°C</div>
+                            <div class="depth-bar"><div class="depth-bar-fill"></div></div>
+                        </div>
+                        <div class="depth-item" data-depth="3">
+                            <div class="depth-label">第4层</div>
+                            <div class="depth-temp">--.-°C</div>
+                            <div class="depth-bar"><div class="depth-bar-fill"></div></div>
+                        </div>
+                        <div class="depth-item" data-depth="4">
+                            <div class="depth-label">第5层</div>
+                            <div class="depth-temp">--.-°C</div>
+                            <div class="depth-bar"><div class="depth-bar-fill"></div></div>
+                        </div>
+                        <div class="depth-item" data-depth="5">
+                            <div class="depth-label">第6层</div>
+                            <div class="depth-temp">--.-°C</div>
+                            <div class="depth-bar"><div class="depth-bar-fill"></div></div>
+                        </div>
+                        <div class="depth-item" data-depth="6">
+                            <div class="depth-label">第7层</div>
+                            <div class="depth-temp">--.-°C</div>
+                            <div class="depth-bar"><div class="depth-bar-fill"></div></div>
+                        </div>
+                        <div class="depth-item" data-depth="7">
+                            <div class="depth-label">第8层</div>
+                            <div class="depth-temp">--.-°C</div>
+                            <div class="depth-bar"><div class="depth-bar-fill"></div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 温度图表 (大) -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <svg class="card-title-icon" viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z" fill="currentColor"/></svg>
+                        温度曲线
+                    </h3>
+                    <button class="btn-sm" id="btnClearDetailChart">清除</button>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container chart-container-large">
+                        <canvas id="topicDetailChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 消息日志 (仅该主题) -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <svg class="card-title-icon" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" fill="currentColor"/></svg>
+                        数据记录
+                    </h3>
+                    <button class="btn-sm" id="btnClearDetailLog">清空</button>
+                </div>
+                <div class="card-body">
+                    <div class="table-container" style="max-height:300px;">
+                        <table class="data-table">
+                            <thead>
+                                <tr><th>#</th><th>时间</th><th>温度 (°C)</th><th>状态</th></tr>
+                            </thead>
+                            <tbody id="detailTableBody">
+                                <tr><td colspan="4" class="table-empty">暂无数据</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== 历史数据页面 ===== -->
+        <section class="page" id="page-history">
+            <header class="page-intro"><div><div class="eyebrow">HISTORY & INSIGHTS</div><h2>回看变化，<span>洞见趋势。</span></h2><p>筛选历史记录，将每一次温度变化转化为洞察。</p></div></header>
+            <!-- 筛选与报表 -->
+            <div class="card history-filter-card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <svg class="card-title-icon" viewBox="0 0 24 24"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" fill="currentColor"/></svg>
+                        数据筛选与报表
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="history-filter">
+                        <div class="filter-row">
+                            <div class="filter-group filter-sensors" id="historyFilterGroup">
+                                <span class="filter-label">测点：</span>
+                                <!-- 传感器复选框将在初始化时动态生成 -->
+                                <label class="checkbox-label"><input type="checkbox" id="fIncludeDepth"> 含深度数据列</label>
+                            </div>
+                            <div class="filter-group filter-presets">
+                                <button class="btn-sm" data-range="1h">最近1小时</button>
+                                <button class="btn-sm" data-range="24h">最近24小时</button>
+                                <button class="btn-sm" data-range="today">今日</button>
+                                <button class="btn-sm" data-range="week">本周</button>
+                                <button class="btn-sm" data-range="all">全部</button>
+                            </div>
+                        </div>
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <span class="filter-label">开始：</span>
+                                <input type="datetime-local" id="fStartTime">
+                            </div>
+                            <div class="filter-group">
+                                <span class="filter-label">结束：</span>
+                                <input type="datetime-local" id="fEndTime">
+                            </div>
+                            <div class="filter-group filter-actions">
+                                <button class="btn-sm btn-primary" id="btnExportCsv">导出 CSV</button>
+                                <button class="btn-sm" id="btnReportDaily">生成日报</button>
+                                <button class="btn-sm" id="btnReportWeekly">生成周报</button>
+                                <button class="btn-sm btn-ai" id="btnAiAnalysis">🤖 AI 分析</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <svg class="card-title-icon" viewBox="0 0 24 24"><path d="M13 3a9 9 0 00-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0013 21a9 9 0 000-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z" fill="currentColor"/></svg>
+                        历史温度记录
+                    </h3>
+                    <div class="chart-controls">
+                        <button class="btn-sm btn-danger" id="btnClearHistory">清除历史</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="history-stats" id="historyStats">
+                        <div class="hstat"><span>数据点数</span><strong id="hCount">0</strong></div>
+                        <div class="hstat"><span>最高温度</span><strong id="hMax">--°C</strong></div>
+                        <div class="hstat"><span>最低温度</span><strong id="hMin">--°C</strong></div>
+                        <div class="hstat"><span>平均温度</span><strong id="hAvg">--°C</strong></div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="historyChart"></canvas>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table" id="historyTable">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>时间戳</th>
+                                    <th>传感器</th>
+                                    <th>温度 (°C)</th>
+                                    <th>来源</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyTableBody">
+                                <tr><td colspan="5" class="table-empty">暂无历史数据</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== 系统设置页面 ===== -->
+        <section class="page" id="page-settings">
+            <header class="page-intro"><div><div class="eyebrow">PREFERENCES</div><h2>按照你的方式，<span>监测。</span></h2><p>精细调整采集、报警与分析，让系统更贴合你的设备。</p></div></header>
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <svg class="card-title-icon" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94L14.4 2.81a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41L9.25 5.35c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" fill="currentColor"/></svg>
+                        系统设置
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="settings-section">
+                        <h4>报警阈值设置</h4>
+                        <div class="settings-row">
+                            <div class="config-item">
+                                <label>高温报警阈值 (°C)</label>
+                                <input type="number" id="alarmHigh" value="50" min="-20" max="100" step="0.5">
+                            </div>
+                            <div class="config-item">
+                                <label>低温报警阈值 (°C)</label>
+                                <input type="number" id="alarmLow" value="0" min="-20" max="100" step="0.5">
+                            </div>
+                            <div class="config-item">
+                                <label>报警音量</label>
+                                <input type="range" id="alarmVolume" value="70" min="0" max="100">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h4>数据记录设置</h4>
+                        <div class="settings-row">
+                            <div class="config-item">
+                                <label>最大历史记录数</label>
+                                <input type="number" id="maxHistorySize" value="1000" min="100" max="10000" step="100">
+                            </div>
+                            <div class="config-item">
+                                <label>图表刷新间隔 (ms)</label>
+                                <input type="number" id="chartInterval" value="1000" min="200" max="5000" step="100">
+                            </div>
+                            <div class="config-item">
+                                <label>图表最大数据点数</label>
+                                <input type="number" id="maxChartPoints" value="60" min="20" max="300" step="10">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h4>传感器数量配置</h4>
+                        <div class="settings-row">
+                            <div class="config-item">
+                                <label>传感器数量 (2-8)</label>
+                                <input type="number" id="sensorCount" value="3" min="2" max="8" step="1">
+                            </div>
+                        </div>
+                        <div id="sensorNameEditor" class="settings-row" style="flex-wrap:wrap"></div>
+                    </div>
+                    <div class="settings-section">
+                        <h4>AI 分析配置</h4>
+                        <div class="settings-row">
+                            <div class="config-item">
+                                <label>API 端点</label>
+                                <input type="text" id="aiEndpoint" value="https://ark.cn-beijing.volces.com/api/v3/chat/completions" placeholder="AI API 端点">
+                            </div>
+                            <div class="config-item">
+                                <label>API Key</label>
+                                <input type="password" id="aiApiKey" placeholder="输入 API Key">
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn-primary" id="btnSaveSettings">保存设置</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== 关于系统页面 ===== -->
+        <section class="page" id="page-about">
+            <header class="page-intro"><div><div class="eyebrow">ABOUT IOT MONITOR</div><h2>感知温度，<span>连接万物。</span></h2><p>为每一个监测点，提供清晰可靠的观察视角。</p></div></header>
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <svg class="card-title-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" fill="currentColor"/></svg>
+                        关于系统
+                    </h3>
+                </div>
+                <div class="card-body about-content">
+                    <div class="about-hero">
+                        <h2>IoT 温度监控平台</h2>
+                        <p class="about-version">版本 2.0.0</p>
+                        <p class="about-desc">
+                            本系统为嵌入式设备远程温度监测平台，支持 EMQX 服务器和网口直连两种数据接入模式。
+                            基于 STM32MP157 嵌入式平台开发，集成 MQTT 通信、AI 智能分析、TTS 语音播报等功能，
+                            适用于工业物联网、智能家居、环境监测等场景。
+                        </p>
+                    </div>
+                    <div class="about-features">
+                        <div class="feature-item">
+                            <h4>双模连接</h4>
+                            <p>支持 EMQX MQTT 代理服务器和 TCP/WebSocket 网口直连两种模式</p>
+                        </div>
+                        <div class="feature-item">
+                            <h4>实时监控</h4>
+                            <p>毫秒级数据刷新，多传感器并行监测，可视化温度曲线</p>
+                        </div>
+                        <div class="feature-item">
+                            <h4>智能报警</h4>
+                            <p>自定义温度阈值，超限自动报警，支持声音和视觉双重提醒</p>
+                        </div>
+                        <div class="feature-item">
+                            <h4>AI 分析</h4>
+                            <p>集成大语言模型，智能分析温度趋势，提供运维建议</p>
+                        </div>
+                        <div class="feature-item">
+                            <h4>数据导出</h4>
+                            <p>支持 CSV 格式导出历史数据，便于离线分析和报告生成</p>
+                        </div>
+                        <div class="feature-item">
+                            <h4>跨平台</h4>
+                            <p>基于 Web 技术构建，支持 PC、平板、手机等多种终端访问</p>
+                        </div>
+                    </div>
+                    <div class="about-tech">
+                        <h4>技术栈</h4>
+                        <div class="tech-tags">
+                            <span>Qt 5.12.9</span><span>C++11</span><span>MQTT 3.1.1</span>
+                            <span>STM32MP157</span><span>OpenSTLinux</span><span>Chart.js</span>
+                            <span>MQTT.js</span><span>WebSocket</span><span>ARM Cortex-A7</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <nav class="mobile-dock" aria-label="手机版导航">
+        <button type="button" class="dock-item active" data-go-page="dashboard" aria-current="page"><span class="dock-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg></span><span>概览</span></button>
+        <button type="button" class="dock-item" data-go-page="coal3d"><span class="dock-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 2 9 5-9 5-9-5 9-5Zm-9 5v10l9 5 9-5V7M12 12v10"/></svg></span><span>3D 热场</span></button>
+        <button type="button" class="dock-item" data-go-page="history"><span class="dock-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 10a8 8 0 1 1 .8 6M4 4v6h6m2-3v5l3 2"/></svg></span><span>记录</span></button>
+        <button type="button" class="dock-item" data-go-page="settings"><span class="dock-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></svg></span><span>设置</span></button>
+        <button type="button" class="dock-item" id="dockMore"><span class="dock-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></span><span>更多</span></button>
+    </nav>
+
+    <!-- 报警弹窗 -->
+    <div class="alarm-toast hidden" id="alarmToast">
+        <div class="alarm-toast-icon">&#9888;</div>
+        <div class="alarm-toast-text" id="alarmToastText">温度异常！</div>
+    </div>
+
+    <!-- ========== 脚本 ========== -->
+    <script src="js/ring-buffer.js"></script>
+    <script src="js/alarm-engine.js"></script>
+    <script src="js/mqtt-client.js"></script>
+    <script src="js/socket-client.js"></script>
+    <script src="js/datasource.js"></script>
+    <script src="js/widgets.js"></script>
+    <script src="js/ai-analysis.js"></script>
+    <script src="js/coal-pile-3d.js?v=studio-2"></script>
+    <script src="js/coal-pile-detail.js?v=studio-2"></script>
+    <script src="js/report.js"></script>
+    <script src="js/app.js?v=liquid-3"></script>
+    <script src="js/interface.js?v=liquid-9"></script>
+</body>
+</html>
