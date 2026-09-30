@@ -1,0 +1,139 @@
+/* A quieter workspace column. The rest of the Liquid Glass design is unchanged. */
+.sidebar {
+    background: #ffffffc2;
+    border-color: #ffffffd6;
+    border-radius: 22px;
+    box-shadow: 0 9px 28px #28446613, inset 0 1px 0 #fff;
+    backdrop-filter: blur(28px) saturate(1.18);
+    -webkit-backdrop-filter: blur(28px) saturate(1.18);
+}
+.sidebar-header { padding: 25px 22px 26px; }
+.logo { gap: 10px; }
+.logo-icon { width: 32px; height: 32px; border-radius: 10px; box-shadow: 0 4px 12px #0754c32b; }
+.logo-title { font-size: 14px; font-weight: 650; }
+.sidebar .logo-subtitle { display: none; }
+.sidebar-section-label { display: none; }
+.sidebar-nav { padding: 0 12px; gap: 3px; }
+.nav-item { min-height: 43px; padding: 9px 12px; gap: 11px; border-radius: 11px; font-size: 12px; }
+.nav-icon { width: 17px; height: 17px; }
+.nav-item:hover { background: #ffffff83; }
+.nav-item.active {
+    background: #eaf3ffb0; color: #1767c6; font-weight: 600;
+    box-shadow: none;
+}
+.nav-item.active .nav-icon { color: #1767c6; }
+.sidebar-shortcut {
+    gap: 9px; margin: 8px 12px 10px; padding: 11px 12px;
+    background: #ffffff69; border: 1px solid #ffffffbb; border-radius: 12px;
+    box-shadow: none;
+}
+.sidebar-shortcut:hover { background: #ffffffbd; }
+.sidebar-shortcut strong { font-size: 12px; color: #355374; }
+.sidebar-shortcut small { display: none; }
+.shortcut-icon { width: 24px; height: 24px; border-radius: 7px; color: #3074cd; background: #e9f2ff; font-size: 17px; }
+.shortcut-arrow { color: #8194ac; font-size: 12px; }
+.sidebar-footer { padding: 15px 21px; border-color: #ffffffac; }
+.sidebar-footer .version { display: none; }
+.system-status { color: #74839a; font-size: 11px; }
+.sidebar.collapsed .sidebar-header { padding: 25px 20px 26px; }
+.sidebar.collapsed .sidebar-nav { padding: 0 12px; }
+.sidebar.collapsed .nav-item { padding: 11px; }
+.sidebar.collapsed .sidebar-footer { padding: 15px 20px; }
+
+/* The same restrained treatment applies when workspace opens as a phone drawer. */
+html[data-edition="mobile"] .sidebar { border-radius: 0 22px 22px 0; }
+html[data-edition="mobile"] .sidebar.collapsed .sidebar-section-label { display: none; }
+html[data-edition="mobile"] .sidebar.collapsed .sidebar-header { padding: 25px 22px 26px; }
+html[data-edition="mobile"] .sidebar.collapsed .nav-item { gap: 11px; padding: 9px 12px; }
+html[data-edition="mobile"] .sidebar.collapsed .logo-text,
+html[data-edition="mobile"] .sidebar.collapsed .nav-item span { width: auto; opacity: 1; visibility: visible; }
+html[data-edition="mobile"] .sidebar.collapsed .sidebar-shortcut { display: flex; }
+html[data-edition="mobile"] .sidebar.collapsed .sidebar-footer { padding: 15px 21px; }
+html[data-edition="mobile"] .sidebar .version { display: none; }
+@media (prefers-reduced-transparency: reduce) {
+    .sidebar { background: #fff; backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+
+/* Desktop navigation sits directly in the workspace, without a full-height card. */
+@media (min-width: 681px) {
+    html:not([data-edition="mobile"]) .sidebar {
+        background: transparent;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+    html:not([data-edition="mobile"]) .sidebar .nav-item.active {
+        background: #ffffffb8;
+        box-shadow: 0 4px 14px #31527c12;
+    }
+    html:not([data-edition="mobile"]) .sidebar .sidebar-shortcut {
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+    }
+    html:not([data-edition="mobile"]) .sidebar .sidebar-shortcut:hover {
+        background: #ffffff85;
+    }
+    html:not([data-edition="mobile"]) .sidebar .sidebar-footer {
+        border-top: 0;
+    }
+}
+
+/* Give the full desktop rail a compact launcher layout instead of a stacked list. */
+@media (min-width: 901px) {
+    html:not([data-edition="mobile"]) .sidebar:not(.collapsed) .sidebar-nav {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-auto-rows: min-content;
+        align-content: start;
+        gap: 8px;
+        padding: 0 12px;
+    }
+    html:not([data-edition="mobile"]) .sidebar:not(.collapsed) .nav-item {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 7px;
+        min-width: 0;
+        min-height: 79px;
+        padding: 11px 5px;
+        border-radius: 15px;
+        color: #526781;
+        text-align: center;
+        font-size: 11px;
+        font-weight: 560;
+    }
+    html:not([data-edition="mobile"]) .sidebar:not(.collapsed) .nav-item .nav-icon {
+        width: 32px;
+        height: 32px;
+        padding: 7px;
+        border-radius: 11px;
+        background: #ffffff9c;
+        color: #497199;
+    }
+    html:not([data-edition="mobile"]) .sidebar:not(.collapsed) .nav-item:first-child {
+        grid-column: 1 / -1;
+        flex-direction: row;
+        justify-content: flex-start;
+        gap: 10px;
+        min-height: 56px;
+        padding: 11px 12px;
+        text-align: left;
+        font-size: 12px;
+    }
+    html:not([data-edition="mobile"]) .sidebar:not(.collapsed) .nav-item:hover {
+        background: #ffffff8c;
+        color: #185fac;
+    }
+    html:not([data-edition="mobile"]) .sidebar:not(.collapsed) .nav-item.active {
+        background: #ffffffc7;
+        color: #1767c6;
+        box-shadow: 0 5px 17px #31527c15, inset 0 1px 0 #ffffffc9;
+    }
+    html:not([data-edition="mobile"]) .sidebar:not(.collapsed) .nav-item.active .nav-icon {
+        background: #e5f1ff;
+        color: #1767c6;
+    }
+}
